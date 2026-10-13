@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Focus — Study Timer</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --panel: #ffffff;
+      --text: #20263a;
+      --muted: #737b91;
+      --border: #e3e7f0;
+      --accent: #6578d8;
+      --accent-light: #edf0ff;
+      --green: #54a88a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 28px 16px 40px;
+      background: var(--bg); color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .app { max-width: 760px; margin: 0 auto; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+    .eyebrow { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .13em; }
+    h1 { font-size: 28px; margin: 5px 0 0; letter-spacing: -.04em; }
+    .date { color: var(--muted); font-size: 14px; }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 22px; padding: 24px; margin-bottom: 16px;
+      box-shadow: 0 8px 28px rgba(31, 43, 82, .035);
+    }
+    .timer-panel { text-align: center; }
+    .mode { font-size: 12px; font-weight: 750; letter-spacing: .13em; color: var(--muted); }
+    .clock { font-size: clamp(48px, 10vw, 76px); font-weight: 700; letter-spacing: -.055em; font-variant-numeric: tabular-nums; margin: 12px 0 4px; }
+    .status { color: var(--muted); font-size: 14px; min-height: 21px; }
+    .actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 22px 0 24px; }
+    button, select, input { font: inherit; }
+    button { min-height: 44px; border-radius: 12px; padding: 10px 16px; border: 1px solid var(--border); background: white; color: var(--text); cursor: pointer; transition: transform .12s, opacity .12s; }
+    button:hover:not(:disabled) { transform: translateY(-1px); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .primary { background: var(--accent); border-color: var(--accent); color: white; font-weight: 650; }
+    .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; text-align: left; }
+    label { display: block; color: var(--muted); font-size: 13px; font-weight: 600; }
+    select, input { width: 100%; margin-top: 7px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 11px; background: #fff; color: var(--text); }
+    .progress-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 9px; text-align: left; }
+    .muted { color: var(--muted); }
+    .bar { width: 100%; height: 9px; background: var(--border); border-radius: 999px; overflow: hidden; }
+    .fill { height: 100%; width: 0; border-radius: inherit; background: var(--accent); transition: width .2s; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 18px 20px; }
+    .stat-label { color: var(--muted); font-size: 13px; }
+    .stat-value { font-size: 28px; font-weight: 720; margin-top: 5px; letter-spacing: -.03em; }
+    h2 { font-size: 18px; margin: 0; }
+    .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .subject-row { margin: 15px 0; }
+    .subject-meta { display: flex; justify-content: space-between; gap: 12px; align-items: center; font-size: 13px; margin-bottom: 8px; }
+    .subject-name { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+    .empty { color: var(--muted); font-size: 14px; padding: 8px 0 2px; }
+    .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 18px; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #c7ceff; outline-offset: 2px; }
+    @media (max-width: 480px) {
+      body { padding: 20px 12px 30px; }
+      .panel { padding: 19px; border-radius: 18px; }
+      h1 { font-size: 24px; }
+      .settings { gap: 10px; }
+      .stat { padding: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <div class="eyebrow">YOUR STUDY SPACE</div>
+        <h1>Focus on today. <span aria-hidden="true">✦</span></h1>
+      </div>
+      <div class="date" id="today-date"></div>
+    </header>
+
+    <section class="panel timer-panel" aria-label="Study timer">
+      <div class="mode">FOCUS SESSION</div>
+      <div class="clock" id="clock" role="timer" aria-live="off">00:00:00</div>
+      <div class="status" id="status" aria-live="polite">Ready when you are.</div>
+
+      <div class="actions">
+        <button class="primary" id="start-btn" type="button">▶ Start studying</button>
+        <button id="pause-btn" type="button" disabled>Ⅱ Pause</button>
+        <button id="reset-btn" type="button">↺ Finish / Reset</button>
+      </div>
+
+      <div class="settings">
+        <label for="subject-select">Study subject
+          <select id="subject-select">
+            <option>H2 Mathematics</option>
+            <option>H2 Physics</option>
+            <option>H2 Computing</option>
+            <option>H1 Economics</option>
+            <option>General Paper</option>
+            <option>Chinese</option>
+            <option>Other</option>
+          </select>
+        </label>
+        <label for="goal-input">Daily goal (hours)
+          <input id="goal-input" type="number" min="0.5" max="24" step="0.5" value="4">
+        </label>
+      </div>
+
+      <div style="margin-top: 22px;">
+        <div class="progress-head">
+          <span class="muted">Today's progress</span>
+          <strong id="progress-label">0m / 4h</strong>
+        </div>
+        <div class="bar" role="progressbar" aria-label="Daily study goal progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-bar">
+          <div class="fill" id="progress-fill"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats" aria-label="Daily statistics">
+      <div class="stat">
+        <div class="stat-label">Today's study time</div>
+        <div class="stat-value" id="total-time">0m</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Sessions completed</div>
+        <div class="stat-value" id="session-count">0</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-heading">
+        <h2>Subject breakdown</h2>
+        <span class="muted" style="font-size:12px;">Today's time</span>
+      </div>
+      <div id="breakdown"><div class="empty">Start studying to build your log.</div></div>
+    </section>
+
+    <div class="footer">Your study data is saved in this browser on this device.</div>
+  </main>
+
+  <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      const STORAGE_KEY = "focusStudyTimer_v1";
+      const colors = ["#6578d8", "#54a88a", "#d39a53", "#a28bd5", "#d67888", "#58aeb8", "#9299a9"];
+      const todayKey = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      };
+
+      let day = todayKey();
+      let elapsed = 0;
+      let running = false;
+      let startedAt = 0;
+      let intervalId = null;
+      let totals = {};
+      let sessions = 0;
+      let activeSubject = "H2 Mathematics";
+
+      function loadData() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+          if (saved && saved.day === day) {
+            totals = saved.totals && typeof saved.totals === "object" ? saved.totals : {};
+            sessions = Number.isFinite(saved.sessions) ? saved.sessions : 0;
+            elapsed = Number.isFinite(saved.elapsed) ? saved.elapsed : 0;
+            if (saved.running && Number.isFinite(saved.startedAt)) {
+              elapsed += Math.max(0, Math.floor((Date.now() - saved.startedAt) / 1000));
+            }
+          }
+        } catch (_) { /* Use a fresh session if saved data is unavailable. */ }
+        running = false;
+        startedAt = 0;
+      }
+
+      function saveData() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            day, totals, sessions, elapsed, running, startedAt
+          }));
+        } catch (_) {
+          $("status").textContent = "Browser storage is unavailable; your timer still works for this visit.";
+        }
+      }
+
+      function formatClock(seconds) {
+        seconds = Math.max(0, Math.floor(seconds));
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        return [h, m, s].map(n => String(n).padStart(2, "0")).join(":");
+      }
+
+      function prettyTime(seconds) {
+        seconds = Math.max(0, Math.floor(seconds));
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        if (h) return `${h}h ${m}m`;
+        if (m) return `${m}m`;
+        return seconds > 0 ? "<1m" : "0m";
+      }
+
+      function currentElapsed() {
+        return elapsed + (running ? Math.floor((Date.now() - startedAt) / 1000) : 0);
+      }
+
+      function rotateDayIfNeeded() {
+        const nowDay = todayKey();
+        if (nowDay !== day) {
+          day = nowDay;
+          elapsed = 0;
+          totals = {};
+          sessions = 0;
+          running = false;
+          startedAt = 0;
+          stopInterval();
+          $("today-date").textContent = new Date().toLocaleDateString(undefined, {weekday:"short", day:"numeric", month:"short"});
+          saveData();
+        }
+      }
+
+      function draw() {
+        rotateDayIfNeeded();
+        const current = currentElapsed();
+        const total = Object.values(totals).reduce((sum, value) => sum + value, 0);
+        const goalHours = Math.max(0.5, Math.min(24, Number($("goal-input").value) || 4));
+        const goalSeconds = goalHours * 3600;
+
+        $("clock").textContent = formatClock(current);
+        $("start-btn").disabled = running;
+        $("start-btn").textContent = running ? "● Studying…" : (elapsed ? "▶ Resume studying" : "▶ Start studying");
+        $("pause-btn").disabled = !running;
+        $("status").textContent = running ? "Timer running — keep going!" : (elapsed ? "Paused. Ready to continue?" : "Ready when you are.");
+        $("total-time").textContent = prettyTime(total);
+        $("session-count").textContent = String(sessions);
+        $("progress-label").textContent = `${prettyTime(total)} / ${goalHours}h`;
+        const percent = Math.min(100, total / goalSeconds * 100);
+        $("progress-fill").style.width = `${percent}%`;
+        $("progress-bar").setAttribute("aria-valuenow", String(Math.round(percent)));
+
+        const names = Object.keys(totals).filter(name => totals[name] > 0).sort((a,b) => totals[b] - totals[a]);
+        const breakdown = $("breakdown");
+        breakdown.replaceChildren();
+        if (!names.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "Start studying to build your log.";
+          breakdown.appendChild(empty);
+        } else {
+          names.forEach((name, index) => {
+            const row = document.createElement("div");
+            row.className = "subject-row";
+            const meta = document.createElement("div");
+            meta.className = "subject-meta";
+            const nameWrap = document.createElement("div");
+            nameWrap.className = "subject-name";
+            const dot = document.createElement("span");
+            dot.className = "dot";
+            dot.style.background = colors[index % colors.length];
+            const label = document.createElement("span");
+            label.textContent = name;
+            nameWrap.append(dot, label);
+            const time = document.createElement("strong");
+            time.textContent = prettyTime(totals[name]);
+            meta.append(nameWrap, time);
+            const bar = document.createElement("div");
+            bar.className = "bar";
+            const fill = document.createElement("div");
+            fill.className = "fill";
+            fill.style.background = colors[index % colors.length];
+            fill.style.width = `${total ? totals[name] / total * 100 : 0}%`;
+            bar.appendChild(fill);
+            row.append(meta, bar);
+            breakdown.appendChild(row);
+          });
+        }
+        saveData();
+      }
+
+      function stopInterval() {
+        if (intervalId !== null) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      }
+
+      function start() {
+        if (running) return;
+        rotateDayIfNeeded();
+        activeSubject = $("subject-select").value;
+        running = true;
+        startedAt = Date.now();
+        stopInterval();
+        intervalId = setInterval(draw, 500);
+        draw();
+      }
+
+      function pause() {
+        if (!running) return;
+        elapsed = currentElapsed();
+        running = false;
+        startedAt = 0;
+        stopInterval();
+        draw();
+      }
+
+      function finishAndReset() {
+        const duration = currentElapsed();
+        if (duration >= 60) {
+          totals[activeSubject] = (totals[activeSubject] || 0) + duration;
+          sessions += 1;
+        }
+        running = false;
+        startedAt = 0;
+        elapsed = 0;
+        stopInterval();
+        draw();
+        $("status").textContent = duration >= 60
+          ? "Session saved. Nice work!"
+          : "Timer reset. Sessions under one minute aren't added to your log.";
+      }
+
+      $("start-btn").addEventListener("click", start);
+      $("pause-btn").addEventListener("click", pause);
+      $("reset-btn").addEventListener("click", finishAndReset);
+      $("goal-input").addEventListener("change", () => {
+        const n = Number($("goal-input").value);
+        if (!Number.isFinite(n) || n < 0.5 || n > 24) {
+          $("goal-input").value = 4;
+          $("status").textContent = "Choose a daily goal between 0.5 and 24 hours.";
+        }
+        draw();
+      });
+      $("subject-select").addEventListener("change", () => {
+        if (running) pause();
+        const duration = elapsed;
+        if (duration >= 60) {
+          totals[activeSubject] = (totals[activeSubject] || 0) + duration;
+          sessions += 1;
+        }
+        elapsed = 0;
+        activeSubject = $("subject-select").value;
+        draw();
+      });
+
+      loadData();
+      $("today-date").textContent = new Date().toLocaleDateString(undefined, {weekday:"short", day:"numeric", month:"short"});
+      draw();
+      window.addEventListener("pagehide", saveData);
+    })();
+  </script>
+</body>
+</html>
